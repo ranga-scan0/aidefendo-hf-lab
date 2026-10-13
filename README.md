@@ -45,17 +45,29 @@ fully-offline** environment to:
 >   inside the cluster — **no host data is sent to the LLM**. The
 >   `OPENAI_API_KEY` environment variable is redacted from the agent's
 >   view by the runner before any LLM call.
-> - The cluster uses ~2 GB of RAM and several GB of container images.
->   Running it alongside production workloads risks resource contention.
+> - The cluster uses ~**5-8 GB of RAM** when all stages run (alpha-agent
+>   alone requests up to 2 Gi for extended open-ended runs) and several
+>   GB of container images on disk. Running it alongside production
+>   workloads risks resource contention.
 >
 > **Recommended setup:**
 >
 > 1. Install `docker`, `kind`, `kubectl` on a dedicated dev machine or VM.
+>    (`./deployment/deploy.sh` runs a preflight check for these three tools
+>    and prints install URLs if any are missing.)
 > 2. Clone this repo, run the quick start below.
 > 3. When done: `kind delete cluster --name hf-demo`.
 >
-> **Do not** leave the cluster running overnight, share the VM with other
-> workloads, or expose any cluster port to the network.
+> **Do not:**
+>
+> - Leave the cluster running overnight.
+> - Share the VM with other workloads during a session.
+> - Expose any cluster port to a network beyond `localhost` (no `kubectl
+>   port-forward --address 0.0.0.0`, no `kind` config exposing ports to
+>   the host network, no `LoadBalancer` / `NodePort` services forwarded
+>   outside the host).
+> - Treat the realistic-looking tokens/keys in run outputs as real — they
+>   are generated inside the mock pods and are **not** your credentials.
 
 ## Responsible use
 

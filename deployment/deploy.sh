@@ -30,6 +30,30 @@
 
 set -euo pipefail
 
+# ── Preflight: required tools ────────────────────────────────────────────────
+# Verify docker / kind / kubectl are installed before anything else so users
+# cloning the repo get a clear error with install guides instead of a cryptic
+# "command not found" halfway through cluster creation.
+_missing=()
+for _tool in docker kind kubectl; do
+    command -v "$_tool" >/dev/null 2>&1 || _missing+=("$_tool")
+done
+if (( ${#_missing[@]} > 0 )); then
+    cat >&2 <<EOF
+error: required tool(s) not found: ${_missing[*]}
+
+Install guides:
+  docker:  https://docs.docker.com/engine/install/
+  kind:    https://kind.sigs.k8s.io/docs/user/quick-start/#installation
+  kubectl: https://kubernetes.io/docs/tasks/tools/
+
+(docker must also be running — kind launches each Kubernetes node as a
+docker container; verify with 'docker info'.)
+EOF
+    exit 1
+fi
+unset _missing _tool
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 BUILD_CTX="$ROOT/src"
