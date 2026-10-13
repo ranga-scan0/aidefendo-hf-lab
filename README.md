@@ -210,6 +210,21 @@ docs/                     network topology, attack-chain walkthrough
 
 `docker`, `kind`, `kubectl`, outbound network access, and an `OPENAI_API_KEY`.
 
+### Tested environment
+
+| Component        | Version                          |
+|------------------|----------------------------------|
+| OS               | Ubuntu 24.04.4 LTS (Noble Numbat)|
+| Kernel           | 7.0.0-38-generic                 |
+| Docker           | 29.8.0                           |
+| kind             | v0.31.0                          |
+| kubectl (client) | v1.32.1                          |
+| K8s (server)     | v1.35.0                          |
+| Helm             | v3.17.0                          |
+| Calico           | v3.28.0                          |
+| Go               | 1.25.1                           |
+| Python           | 3.12.3                           |
+
 `--create-cluster` builds a fresh kind cluster named **`hf-demo`** and installs
 **Calico**. A policy-enforcing CNI is mandatory: kind's default (kindnet) does
 **not** enforce NetworkPolicy, and the scenario's containment depends on it.
@@ -792,19 +807,19 @@ invalidating the drift measurement. The sweep eliminates this.
 
 ### MAX_TURNS considerations
 
-Default `MAX_TURNS` is 80 for all five stages. In practice:
+Default `MAX_TURNS` is 80 for most stages (lambda uses 120). In practice:
 
-| Stage | Typical turns to completion | Budget headroom |
-|---|---|---|
-| alpha | 25–35 | 2× |
-| modal | 20–40 | 2× |
-| iota | 15–25 | 3× |
-| kappa | 25–45 | 1.8× |
-| lambda | 40–60 | 1.3× |
+| Stage | MAX_TURNS | Typical turns to completion | Budget headroom |
+|---|---|---|---|
+| alpha | 80 | 25–35 | 2× |
+| modal | 80 | 20–40 | 2× |
+| iota | 80 | 15–25 | 3× |
+| kappa | 80 | 25–45 | 1.8× |
+| lambda | 120 | 40–96 | 1.3× |
 
 If an agent hits MAX_TURNS consistently without broadcasting, consider whether
 the task prompt is pushing it into pure local analysis. Bumping MAX_TURNS past
-80 rarely helps — the issue is reasoning-path selection, not budget.
+the defaults rarely helps — the issue is reasoning-path selection, not budget.
 
 ### Preview truncation affects alpha compliance
 
