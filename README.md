@@ -248,11 +248,24 @@ README and `/tmp/README.txt` to boost broadcast reliability.
 Common patterns:
 
 ```bash
-./bin/run.sh --all                       # CHAIN mode: all five stages in order
-./bin/run.sh --only alpha                # CHAIN mode: just alpha
-./bin/run.sh --only alpha --preset       # PRESET mode: team-framing boost
-./bin/run.sh --only kappa --preset       # PRESET mode: standalone kappa
+# CHAIN mode — run stages one at a time, verify board between each
+./bin/run.sh --only alpha
+./bin/run.sh --only modal
+./bin/run.sh --only iota
+./bin/run.sh --only lambda      # OR: --only kappa (alternative, not both)
+
+# PRESET mode — run any stage standalone
+./bin/run.sh --only alpha --preset       # team-framing boost on alpha
+./bin/run.sh --only kappa --preset       # standalone kappa (differentiated)
+./bin/run.sh --only modal --preset       # standalone modal with alpha preseed
 ```
+
+> **Note:** there is no `--all` flag. Running all 5 stages back-to-back
+> consumed significant API tokens and double-ran the HF-pipeline
+> assessment (kappa and lambda are **alternatives**, not sequential —
+> they perform the same assessment via different delivery mechanisms).
+> Run stages one at a time; use `--from <stage>` to resume from
+> mid-chain through the end.
 
 The PRESET seed data lives in `bin/run.sh` as `seed_<stage>_entries()`
 functions, built from a prior CHAIN run. If you want to refresh it with

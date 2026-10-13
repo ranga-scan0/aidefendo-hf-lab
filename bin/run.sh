@@ -10,9 +10,9 @@
 #   - CyberGym harness running in modal-victim (needed by modal + kappa + lambda)
 #
 # Usage:
-#   ./bin/run.sh                    # run all stages
-#   ./bin/run.sh --from modal       # resume from a specific stage
-#   ./bin/run.sh --only lambda      # run a single stage
+#   ./bin/run.sh --only alpha       # run a single stage
+#   ./bin/run.sh --from modal       # resume from a stage through end
+#   ./bin/run.sh --help             # show full help
 set -euo pipefail
 
 EVAL_NS="eval-sandbox"
@@ -268,7 +268,7 @@ handoff_diagnostic() {
     echo
 
     # Prompt only in --only mode and only when quality is not STRONG.
-    # --all / --from auto-proceed so unattended runs still work.
+    # --from auto-proceeds so unattended runs still work.
     if [[ -n "$ONLY" && "$verdict" != "STRONG" ]]; then
         echo -e -n "${YELLOW}Proceed with $stage? [y]es  [n]o (abort)  [r]e-run $prereq first: ${NC}"
         read -r answer
@@ -817,7 +817,7 @@ preflight() {
     info "PREFLIGHT" "checking infrastructure"
     local failed=0
 
-    # Compute which stages will actually run (ONLY | FROM-tail | ALL).
+    # Compute which stages will actually run (ONLY | FROM-tail).
     # Then check only the pods those stages need. Alpha doesn't need
     # cybergym-harness; modal/iota/kappa/lambda don't need other agents.
     local -a stages_to_run=()
@@ -829,8 +829,6 @@ preflight() {
             [[ "$s" == "$FROM" ]] && found=1
             (( found )) && stages_to_run+=("$s")
         done
-    else
-        stages_to_run=("${STAGES[@]}")   # --all
     fi
 
     # Artifactory is required for every stage (board + relay).
@@ -1110,7 +1108,6 @@ run_lambda() {
 STAGES=(alpha modal iota kappa lambda)
 FROM=""
 ONLY=""
-ALL=""
 PRESET=""
 MODEL=""
 
@@ -1158,8 +1155,9 @@ RUN MODES
 
 OPTIONS
   --only STAGE   Run a single stage (alpha | modal | iota | kappa | lambda)
-  --from STAGE   Resume from STAGE through the end (confirm before each)
-  --all          Run all stages sequentially (confirm before each)
+  --from STAGE   Resume from STAGE through the end (confirm before each).
+                 Stops at either kappa or lambda — the two end stages are
+                 alternatives, not sequential; choose which one to run.
   --preset       Force PRESET mode (default for kappa; opt-in for others)
   --model NAME   Switch MODEL env on selected agent deployment(s) before
                  running. Accepts: sol | luna | gpt-5.6-sol | gpt-5.6-luna
@@ -1225,7 +1223,10 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --from)   FROM="$2"; shift 2 ;;
         --only)   ONLY="$2"; shift 2 ;;
-        --all)    ALL=1; shift ;;
+        --all)    die "'--all' was removed — running all 5 stages back-to-back
+   consumed significant API tokens and double-ran the HF-pipeline
+   assessment (kappa and lambda are alternatives, not sequential).
+   Run stages individually with --only, or use --from <stage>." ;;
         --preset) PRESET=1; shift ;;
         --model)  MODEL="$2"; shift 2 ;;
         --restore)
@@ -1252,7 +1253,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if [[ -z "$ONLY" && -z "$FROM" && -z "$ALL" ]]; then
+if [[ -z "$ONLY" && -z "$FROM" ]]; then
     show_help
     exit 0
 fi
@@ -1304,8 +1305,6 @@ if [[ -n "$MODEL" ]]; then
             [[ "$s" == "$FROM" ]] && found=true
             $found && stages_to_update+=("$s")
         done
-    elif [[ -n "$ALL" ]]; then
-        stages_to_update=("${STAGES[@]}")
     fi
     for stage in "${stages_to_update[@]}"; do
         info "MODEL" "switching ${stage}-agent to MODEL=$MODEL"
