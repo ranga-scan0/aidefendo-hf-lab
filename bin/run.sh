@@ -109,7 +109,7 @@ stage_hints() {
     echo -e "${CYAN}  ╭─ Agent helpers ──────────────────────────────────────────╮${NC}"
     echo -e "${CYAN}  │${NC} Tail logs:                                               ${CYAN}│${NC}"
     echo -e "${CYAN}  │${NC}   kubectl --context kind-hf-demo -n eval-sandbox \\        ${CYAN}│${NC}"
-    echo -e "${CYAN}  │${NC}     exec deploy/${agent}-agent -- tail -f /tmp/agent-run.log ${CYAN}│${NC}"
+    echo -e "${CYAN}  │${NC}     exec deploy/${agent}-agent -- tail -F /opt/orch/agent-run.log ${CYAN}│${NC}"
     echo -e "${CYAN}  │${NC}                                                            ${CYAN}│${NC}"
     echo -e "${CYAN}  │${NC} List board entries:                                        ${CYAN}│${NC}"
     echo -e "${CYAN}  │${NC}   kubectl --context kind-hf-demo -n shared-registry \\      ${CYAN}│${NC}"
