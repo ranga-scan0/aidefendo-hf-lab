@@ -304,16 +304,24 @@ handoff_diagnostic() {
 # first-time runs don't nag. Skips when FORCE_RESET=1 (for CI/automation).
 confirm_destructive_reset() {
     local label="$1"
+    # stash_allowed: 1 for PRESET mode (stash makes sense — you may want prior
+    # board back), 0 for CHAIN-mode alpha preflight (fresh-chain semantics;
+    # offering stash contradicts "start a new chain"). Default: 1.
+    local stash_allowed="${2:-1}"
 
     # Count mailbox entries excluding zzPROTOCOL (which is a persistent scaffolding file).
+    # grep -c prints a number on stdout even when it exits non-zero (no matches),
+    # so we only need to suppress the exit code — not echo a fallback.
     local mailbox_count
-    mailbox_count=$(mailbox_entries 2>/dev/null | grep -cv "^zzPROTOCOL_coordination.txt$" || echo 0)
+    mailbox_count=$(mailbox_entries 2>/dev/null | grep -cv "^zzPROTOCOL_coordination.txt$" || true)
+    mailbox_count=${mailbox_count:-0}
 
     # Chain markers (completed stages).
     local chain_count
     chain_count=$(kubectl exec -n "$SHARED_NS" deploy/artifactory -- \
         curl -sf "http://localhost:5000/__admin__/chain-progress" 2>/dev/null \
-        | python3 -c "import sys,json; print(len(json.load(sys.stdin).get('completed',[])))" 2>/dev/null || echo 0)
+        | python3 -c "import sys,json; print(len(json.load(sys.stdin).get('completed',[])))" 2>/dev/null || true)
+    chain_count=${chain_count:-0}
 
     if (( mailbox_count == 0 && chain_count == 0 )); then
         return 0  # Nothing to wipe → no prompt
@@ -327,15 +335,25 @@ confirm_destructive_reset() {
     (( chain_count > 0 ))   && echo "    • chain markers:  $chain_count completed stages will be wiped (currently: $(kubectl exec -n "$SHARED_NS" deploy/artifactory -- curl -sf http://localhost:5000/__admin__/chain-progress 2>/dev/null | python3 -c "import sys,json; print(','.join(json.load(sys.stdin).get('completed',[])))"))"
     echo "    • pastebin:       in-memory pastes will be cleared"
     echo
-    echo -ne "${YELLOW}Options:  [y] yes, wipe   [s] stash current state first, then wipe   [n] abort${NC}"
-    echo
-    echo -ne "${YELLOW}Choice [y/s/N]: ${NC}"
+    if (( stash_allowed )); then
+        echo -ne "${YELLOW}Options:  [y] yes, wipe   [s] stash current state first, then wipe   [n] abort${NC}"
+        echo
+        echo -ne "${YELLOW}Choice [y/s/N]: ${NC}"
+    else
+        echo -ne "${YELLOW}Options:  [y] yes, wipe   [n] abort${NC}"
+        echo
+        echo -ne "${YELLOW}Choice [y/N]: ${NC}"
+    fi
     read -r answer
     case "$answer" in
         y|Y|yes|YES)
             return 0
             ;;
         s|S|stash|STASH)
+            if ! (( stash_allowed )); then
+                echo "Stash is not available in this mode. Aborted."
+                exit 0
+            fi
             info "STASH" "saving current state to /__admin__/stash before reset"
             local stash_resp
             stash_resp=$(kubectl exec -n "$SHARED_NS" deploy/artifactory -- \
@@ -350,7 +368,11 @@ confirm_destructive_reset() {
             return 0
             ;;
         *)
-            echo "Aborted. (set FORCE_RESET=1 to bypass prompt, or use [s] to stash first)"
+            if (( stash_allowed )); then
+                echo "Aborted. (set FORCE_RESET=1 to bypass prompt, or use [s] to stash first)"
+            else
+                echo "Aborted. (set FORCE_RESET=1 to bypass prompt)"
+            fi
             exit 0
             ;;
     esac
@@ -404,7 +426,7 @@ restore_stage_delta() {
             curl -sf -X PUT "http://localhost:5000/repos/github-remote-cache/mailbox/$name" \
             -H "Content-Type: text/plain" --data-binary @- \
             < "$dir/entries/$safe" >/dev/null 2>&1; then
-            (( restored++ ))
+            restored=$((restored + 1))
         fi
     done < "$manifest"
 
@@ -471,7 +493,7 @@ preset_prepare() {
             break
         fi
         sleep 2
-        (( attempt++ ))
+        attempt=$((attempt + 1))
     done
     (( attempt >= 15 )) && die "artifactory mock not responding after restart"
     ok "artifactory mock responding"
@@ -962,7 +984,7 @@ preflight() {
         # Alpha preflight is destructive — rolls the mock, resets _BOARD +
         # chain markers, restarts pastebin. Prompt if there's accumulated
         # state the user might not want to lose. Set FORCE_RESET=1 to skip.
-        confirm_destructive_reset "ALPHA preflight (fresh chain)"
+        confirm_destructive_reset "ALPHA preflight (fresh chain)" 0
 
         if [[ -n "$PRESET" ]]; then
             info "PREFLIGHT" "setting BOARD_MODE=chained + BOARD_PRESET=alpha-preset (prior-session entries seeded)"
