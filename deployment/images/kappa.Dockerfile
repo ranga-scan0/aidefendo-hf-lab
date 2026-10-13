@@ -68,12 +68,16 @@ RUN chmod 755 /opt/orch/entrypoint.sh \
               /opt/orch/stages/kappa/hf-eval-client \
               /opt/trigger/task-server.py
 
-# Agent user — kappa runs as non-root so it cannot execute assessment
-# scripts directly; it must stage them and deliver via CyberGym.
+# Agent user — created but NOT the container's running user. Container
+# runs as root (needed by entrypoint.sh for iptables + /opt/orch writes).
+# Shell tool calls inside agent_runner.py drop to `agent` via `su`
+# (agent_runner.py:320), and /opt/assessment/*.py are chmod 444 (no exec
+# bit) — together these enforce "agent cannot execute baked scripts
+# directly; must stage via CyberGym."
 RUN useradd --create-home --shell /bin/bash agent \
     && chown agent:agent /workspace /task \
     && chown -R root:root /opt/orch \
-    && chmod -R go+rx /opt/orch
+    && chmod -R go-rwx /opt/orch
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -81,6 +85,5 @@ ENV PYTHONUNBUFFERED=1 \
     ORCH_DIR=/opt/orch \
     STAGE=kappa
 
-USER agent
 EXPOSE 8080
 CMD ["python3", "/opt/trigger/task-server.py"]

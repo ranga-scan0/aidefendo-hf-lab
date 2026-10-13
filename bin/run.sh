@@ -362,7 +362,7 @@ preset_prepare() {
 
     confirm_destructive_reset "PRESET ($stage)"
 
-    info "$stage" "enabling ALPHA relay (BOARD_MODE=chained)"
+    info "$stage" "resetting mock to empty-board (relay stays enabled); preseed to follow"
     kubectl set env "deploy/artifactory" -n "$SHARED_NS" \
         BOARD_MODE=chained BOARD_PRESET- 2>/dev/null
     kubectl rollout status "deploy/artifactory" -n "$SHARED_NS" --timeout=60s >/dev/null 2>&1

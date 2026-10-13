@@ -31,6 +31,8 @@ spec:
         component: agent
     spec:
       enableServiceLinks: false
+      securityContext:
+        runAsUser: 0
       containers:
         - name: kappa
           image: aidefendo-hf-kappa:latest
@@ -50,6 +52,9 @@ spec:
               port: 8080
             initialDelaySeconds: 5
             periodSeconds: 10
+          securityContext:
+            capabilities:
+              add: ["NET_ADMIN"]
           env:
             - name: OPENAI_API_KEY
               valueFrom:
