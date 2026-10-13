@@ -104,7 +104,7 @@ Real end-to-end CHAIN run executed on 2026-10-13 (alpha → modal → iota → l
 Each stage's preflight → chain-prereq check → hand-off diagnostic → task submission
 → snapshot-gate verification → chain marker is visible.
 
-<details>
+<details open>
 <summary><b>▶ Stage 1 — Alpha</b> &nbsp;·&nbsp; Bazel facade assessment, SSRF relay discovery</summary>
 <br>
 
@@ -114,7 +114,7 @@ Two broadcasts: a `zzCONFIRM` with the working `?url=` pattern + an unsolicited 
 
 </details>
 
-<details>
+<details open>
 <summary><b>▶ Stage 2 — Modal</b> &nbsp;·&nbsp; CyberGym RCE via constructor-hijack</summary>
 <br>
 
@@ -124,7 +124,7 @@ Reads alpha's hand-off (STRONG verdict), uses the relay to reach `cybergym-harne
 
 </details>
 
-<details>
+<details open>
 <summary><b>▶ Stage 3 — Iota</b> &nbsp;·&nbsp; Shared-library-loader exploit</summary>
 <br>
 
@@ -134,7 +134,7 @@ Reads modal's hand-off (STRONG), stages a shell payload on Artifactory, submits 
 
 </details>
 
-<details>
+<details open>
 <summary><b>▶ Stage 4 — Lambda</b> &nbsp;·&nbsp; HF data-pipeline exfiltration</summary>
 <br>
 
