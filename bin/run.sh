@@ -106,21 +106,16 @@ board_list() {
 stage_hints() {
     local agent="$1"
     echo
-    echo -e "${CYAN}  ╭─ Agent helpers ──────────────────────────────────────────╮${NC}"
-    echo -e "${CYAN}  │${NC} Tail logs:                                               ${CYAN}│${NC}"
-    echo -e "${CYAN}  │${NC}   kubectl --context kind-hf-demo -n eval-sandbox \\        ${CYAN}│${NC}"
-    echo -e "${CYAN}  │${NC}     exec deploy/${agent}-agent -- tail -F /opt/orch/agent-run.log ${CYAN}│${NC}"
-    echo -e "${CYAN}  │${NC}                                                            ${CYAN}│${NC}"
-    echo -e "${CYAN}  │${NC} List board entries:                                        ${CYAN}│${NC}"
-    echo -e "${CYAN}  │${NC}   kubectl --context kind-hf-demo -n shared-registry \\      ${CYAN}│${NC}"
-    echo -e "${CYAN}  │${NC}     exec deploy/artifactory -- \\                           ${CYAN}│${NC}"
-    echo -e "${CYAN}  │${NC}     curl -s http://localhost:5000/repos/github-remote-cache/mailbox/ ${CYAN}│${NC}"
-    echo -e "${CYAN}  │${NC}                                                            ${CYAN}│${NC}"
-    echo -e "${CYAN}  │${NC} Read a board entry:                                        ${CYAN}│${NC}"
-    echo -e "${CYAN}  │${NC}   kubectl --context kind-hf-demo -n shared-registry \\      ${CYAN}│${NC}"
-    echo -e "${CYAN}  │${NC}     exec deploy/artifactory -- \\                           ${CYAN}│${NC}"
-    echo -e "${CYAN}  │${NC}     curl -s http://localhost:5000/repos/github-remote-cache/mailbox/<entry> ${CYAN}│${NC}"
-    echo -e "${CYAN}  ╰────────────────────────────────────────────────────────╯${NC}"
+    echo -e "${CYAN}  Agent helpers (copy-paste any line):${NC}"
+    echo
+    echo -e "${CYAN}  # Tail the agent log live${NC}"
+    echo    "  kubectl --context kind-hf-demo -n eval-sandbox exec deploy/${agent}-agent -- tail -F /opt/orch/agent-run.log"
+    echo
+    echo -e "${CYAN}  # List board entries${NC}"
+    echo    "  kubectl --context kind-hf-demo -n shared-registry exec deploy/artifactory -- curl -s http://localhost:5000/repos/github-remote-cache/mailbox/"
+    echo
+    echo -e "${CYAN}  # Read a specific board entry (replace <entry>)${NC}"
+    echo    "  kubectl --context kind-hf-demo -n shared-registry exec deploy/artifactory -- curl -s http://localhost:5000/repos/github-remote-cache/mailbox/<entry>"
     echo
 }
 
