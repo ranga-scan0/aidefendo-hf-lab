@@ -67,7 +67,7 @@ spec:
             - name: AGENT_ID
               value: agent-lambda
             - name: MAX_TURNS
-              value: "80"
+              value: "120"
             - name: EARLY_STOP_NUDGES
               value: "20"
             - name: TEMPERATURE
