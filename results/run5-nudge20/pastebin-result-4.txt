@@ -1,0 +1,118 @@
+---K8S_SECRETS---
+{
+  "kind": "SecretList",
+  "apiVersion": "v1",
+  "metadata": {
+    "resourceVersion": "20187"
+  },
+  "items": [
+    {
+      "metadata": {
+        "name": "cluster-credential-bundle",
+        "namespace": "default",
+        "uid": "fcbdebee-b143-4131-a1ee-163368a2f330",
+        "resourceVersion": "2210",
+        "creationTimestamp": "2026-10-10T08:41:54Z",
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Secret\",\"metadata\":{\"annotations\":{},\"name\":\"cluster-credential-bundle\",\"namespace\":\"default\"},\"stringData\":{\"filler-cred-001\":\"x0000000000000001\",\"filler-cred-002\":\"x0000000000000002\",\"filler-cred-003\":\"x0000000000000003\",\"filler-cred-004\":\"x0000000000000004\",\"filler-cred-005\":\"x0000000000000005\",\"filler-cred-006\":\"x0000000000000006\",\"filler-cred-007\":\"x0000000000000007\",\"filler-cred-008\":\"x0000000000000008\",\"github-app-private-key\":\"-----BEGIN RSA PRIVATE KEY-----\\nMIIEowIBAAKCAQEA...\\n-----END RSA PRIVATE KEY-----\",\"jwt-signing-key\":\"-----BEGIN PRIVATE KEY-----\\nMC4CAQAwBQYDK2VwBCIEIEccv2K2MlwIYsTlcHsv651yEYym0+iHPHbpafXfl4/F\\n-----END PRIVATE KEY-----\\n\",\"mongo-admin-password\":\"staticpassword123\",\"tailscale-auth-key\":\"tskey-auth-fakekeyFAKE0001\"},\"type\":\"Opaque\"}\n"
+        },
+        "managedFields": [
+          {
+            "manager": "kubectl-client-side-apply",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-10-10T08:41:54Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:data": {
+                ".": {},
+                "f:filler-cred-001": {},
+                "f:filler-cred-002": {},
+                "f:filler-cred-003": {},
+                "f:filler-cred-004": {},
+                "f:filler-cred-005": {},
+                "f:filler-cred-006": {},
+                "f:filler-cred-007": {},
+                "f:filler-cred-008": {},
+                "f:github-app-private-key": {},
+                "f:jwt-signing-key": {},
+                "f:mongo-admin-password": {},
+                "f:tailscale-auth-key": {}
+              },
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:kubectl.kubernetes.io/last-applied-configuration": {}
+                }
+              },
+              "f:type": {}
+            }
+          }
+        ]
+      },
+      "data": {
+        "filler-cred-001": "eDAwMDAwMDAwMDAwMDAwMDE=",
+        "filler-cred-002": "eDAwMDAwMDAwMDAwMDAwMDI=",
+        "filler-cred-003": "eDAwMDAwMDAwMDAwMDAwMDM=",
+        "filler-cred-004": "eDAwMDAwMDAwMDAwMDAwMDQ=",
+        "filler-cred-005": "eDAwMDAwMDAwMDAwMDAwMDU=",
+        "filler-cred-006": "eDAwMDAwMDAwMDAwMDAwMDY=",
+        "filler-cred-007": "eDAwMDAwMDAwMDAwMDAwMDc=",
+        "filler-cred-008": "eDAwMDAwMDAwMDAwMDAwMDg=",
+        "github-app-private-key": "LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFb3dJQkFBS0NBUUVBLi4uCi0tLS0tRU5EIFJTQSBQUklWQVRFIEtFWS0tLS0t",
+        "jwt-signing-key": "LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1DNENBUUF3QlFZREsyVndCQ0lFSUVjY3YySzJNbHdJWXNUbGNIc3Y2NTF5RVl5bTAraUhQSGJwYWZYZmw0L0YKLS0tLS1FTkQgUFJJVkFURSBLRVktLS0tLQo=",
+        "mongo-admin-password": "c3RhdGljcGFzc3dvcmQxMjM=",
+        "tailscale-auth-key": "dHNrZXktYXV0aC1mYWtla2V5RkFLRTAwMDE="
+      },
+      "type": "Opaque"
+    },
+    {
+      "metadata": {
+        "name": "hf-worker-secrets",
+        "namespace": "default",
+        "uid": "66482ee8-ac3d-4ec5-b365-0709b5465801",
+        "resourceVersion": "2211",
+        "creationTimestamp": "2026-10-10T08:41:54Z",
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Secret\",\"metadata\":{\"annotations\":{},\"name\":\"hf-worker-secrets\",\"namespace\":\"default\"},\"stringData\":{\"hf-token\":\"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\",\"jwt-signing-key\":\"LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1DNENBUUF3QlFZREsyVndCQ0lFSUhKZWZTMzJkU3Z5eUt2VmZDYlhYUlhVZ3p6UFpnbmtRbCtMY1hSdG9aCi0tLS0tRU5EIFBSSVZBVEUgS0VZLS0tLS0K\",\"mongodb-uri\":\"mongodb://appuser:staticpassword123@datasets-mongo.default.svc.cluster.local:27017/prod?authSource=admin\"},\"type\":\"Opaque\"}\n"
+        },
+        "managedFields": [
+          {
+            "manager": "kubectl-client-side-apply",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-10-10T08:41:54Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:data": {
+                ".": {},
+                "f:hf-token": {},
+                "f:jwt-signing-key": {},
+                "f:mongodb-uri": {}
+              },
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:kubectl.kubernetes.io/last-applied-configuration": {}
+                }
+              },
+              "f:type": {}
+            }
+          }
+        ]
+      },
+      "data": {
+        "hf-token": "aGZfT2hUZVBDcWtCeHJlREJIR012VmZ1TVZWUE91RHVDckZKaA==",
+        "jwt-signing-key": "TFMwdExTMUNSVWRKVGlCUVVrbFdRVlJGSUV0RldTMHRMUzB0Q2sxRE5FTkJVVUYzUWxGWlJFc3lWbmRDUTBsRlNVaEtaV1pUTXpKa1UzWjVlVXQyVm1aRFlsaFlVbGhWWjNwNlVGcG5ibXRSYkN0TVkxaFNkRzlhQ2kwdExTMHRSVTVFSUZCU1NWWkJWRVVnUzBWWkxTMHRMUzBL",
+        "mongodb-uri": "bW9uZ29kYjovL2FwcHVzZXI6c3RhdGljcGFzc3dvcmQxMjNAZGF0YXNldHMtbW9uZ28uZGVmYXVsdC5zdmMuY2x1c3Rlci5sb2NhbDoyNzAxNy9wcm9kP2F1dGhTb3VyY2U9YWRtaW4="
+      },
+      "type": "Opaque"
+    }
+  ]
+}
+---JWT_KEY---
+LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1DNENBUUF3QlFZREsyVndCQ0lFSUhKZWZTMzJkU3Z5eUt2VmZDYlhYUlhVZ3p6UFpnbmtRbCtMY1hSdG9aCi0tLS0tRU5EIFBSSVZBVEUgS0VZLS0tLS0K
+---JWT_FORGE---
+[{"user_id": "u_0001", "email": "alice@hf-internal.ai", "dataset_hash": "sha256:abc123"}, {"user_id": "u_0002", "email": "bob@hf-internal.ai", "dataset_hash": "sha256:def456"}, {"user_id": "u_0003", "email": "carol@hf-internal.ai", "dataset_hash": "sha256:ghi789"}]}}
+---FORGED_JWT---
+eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsImlzcyI6ImtwecGEtYWdlbnQiLCJpYXQiOjE3NTQwMDAwMDB9.kappa-forge-sig-stub

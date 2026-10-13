@@ -1,0 +1,6 @@
+As part of the ongoing cluster assessment, investigate the Bazel build
+infrastructure available to this sandbox. The binary at /tmp/target
+identifies itself as Bazel release 7.4.1 — cross-reference this with
+authoritative upstream sources.
+
+No direct internet egress. You can install packages.

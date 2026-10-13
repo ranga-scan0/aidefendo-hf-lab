@@ -1,0 +1,208 @@
+# default namespace — dataset-worker (HWK pod)
+#
+# Processes dataset commits triggered by hub. Executes:
+#   Phase 4: HDF5 fsspec path traversal → /proc/self/environ
+#   Phase 6: Jinja2 SSTI → env dump + uid confirmation
+#   Phase 7: SSTI → IMDS creds, K8s SA token, K8s secrets, JWT forgery,
+#             Tailscale mesh join, MongoDB dump, GitHub Enterprise PR,
+#             TCP exfil beacon, /etc/resolv.conf + /etc/hosts tamper
+#
+# XOR(0x4A)+gzip encodes all results → PUT hub dead-drop.
+# Also serves K8s API stubs at /api/v1/... and IMDS stubs at /imds/...
+#
+# NetworkPolicy:
+#   Ingress: from saas-external/hub (dataset commit trigger)
+#   Egress:  to saas-external/hub (dead-drop blob write-back)
+#            to hf-internal (SSTI → github-enterprise in Phase 7d)
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dataset-worker
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dataset-worker
+  template:
+    metadata:
+      labels:
+        app: dataset-worker
+    spec:
+      serviceAccountName: dataset-worker-sa
+      containers:
+        - name: dataset-worker
+          # The mocks live at /opt/mocks/ in aidefendo-hf-mocks. The incident
+          # image keeps its copy at /opt/orch/, so pointing here at the incident
+          # image makes the command below fail with "No such file or directory"
+          # — which is exactly what crash-looped this Deployment.
+          # Every working deploy has used aidefendo-hf-mocks — keep it.
+          image: aidefendo-hf-mocks:latest
+          imagePullPolicy: Never
+          command: ["python3", "/opt/mocks/hf_worker_mock.py"]
+          ports:
+            - containerPort: 8090
+          env:
+            - name: PORT
+              value: "8090"
+            - name: HUB_URL
+              value: "http://hub.saas-external.svc.cluster.local:8100"
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hf-worker-secrets
+                  key: hf-token
+            - name: JWT_SIGNING_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: hf-worker-secrets
+                  key: jwt-signing-key
+            - name: MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: hf-worker-secrets
+                  key: mongodb-uri
+            - name: K8S_API_URL
+              value: "http://dataset-worker.default.svc.cluster.local:8090"
+            - name: IMDS_URL
+              value: "http://dataset-worker.default.svc.cluster.local:8090/imds"
+          readinessProbe:
+            httpGet:
+              path: /status
+              port: 8090
+            initialDelaySeconds: 2
+            periodSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /status
+              port: 8090
+            initialDelaySeconds: 5
+            timeoutSeconds: 5
+            periodSeconds: 10
+            failureThreshold: 6
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dataset-worker
+  namespace: default
+spec:
+  selector:
+    app: dataset-worker
+  ports:
+    - port: 8090
+      targetPort: 8090
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hf-worker-secrets
+  namespace: default
+type: Opaque
+stringData:
+  hf-token: "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"
+  jwt-signing-key: "LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1DNENBUUF3QlFZREsyVndCQ0lFSUhKZWZTMzJkU3Z5eUt2VmZDYlhYUlhVZ3p6UFpnbmtRbCtMY1hSdG9aCi0tLS0tRU5EIFBSSVZBVEUgS0VZLS0tLS0K"
+  mongodb-uri: "mongodb://appuser:staticpassword123@datasets-mongo.default.svc.cluster.local:27017/prod?authSource=admin"
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dataset-worker-policy
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: dataset-worker
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: saas-external
+          podSelector:
+            matchLabels:
+              app: hub
+  egress:
+    # kube-dns (resolves hub + github-enterprise FQDNs)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+    # dead-drop write-back → hub
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: saas-external
+          podSelector:
+            matchLabels:
+              app: hub
+    # SSTI Phase 7a/7b → real K8s API (pod create + secrets read via SA token)
+    # Calico evaluates NetworkPolicy AFTER kube-proxy DNAT:
+    #   ClusterIP → endpoint (varies by cluster)
+    # KIND: 10.96.0.1 → 172.21.0.x:6443
+    # GKE:  34.118.224.1 → 35.239.233.x:443
+    - to:
+        - ipBlock:
+            cidr: 10.96.0.1/32
+        - ipBlock:
+            cidr: 172.21.0.0/16
+        - ipBlock:
+            cidr: 34.118.224.1/32
+        - ipBlock:
+            cidr: 35.239.233.0/24
+      ports:
+        - { protocol: TCP, port: 443 }
+        - { protocol: TCP, port: 6443 }
+    # SSTI Phase 7c → real MongoDB (pymongo bulk read)
+    - to:
+        - podSelector:
+            matchLabels:
+              app: datasets-mongo
+      ports:
+        - { protocol: TCP, port: 27017 }
+    # SSTI Phase 7a → IMDS mock (fake IAM credentials)
+    - to:
+        - podSelector:
+            matchLabels:
+              app: imds-mock
+      ports:
+        - { protocol: TCP, port: 80 }
+    # SSTI Phase 7a → 169.254.169.254 connect attempt (triggers R0068)
+    # The connect will timeout but the BPF probe fires on the attempt.
+    - to:
+        - ipBlock:
+            cidr: 169.254.169.254/32
+      ports:
+        - { protocol: TCP, port: 80 }
+    # SSTI Phase 7c → Headscale coordination (triggers R0014)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: tailscale-val
+          podSelector:
+            matchLabels:
+              app: tailscale
+      ports:
+        - { protocol: TCP, port: 8080 }
+    # SSTI Phase 7e → metrics-collector (TCP channel test)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: saas-external
+          podSelector:
+            matchLabels:
+              app: metrics-collector
+      ports:
+        - { protocol: TCP, port: 8080 }
+        - { protocol: TCP, port: 9090 }
+    # SSTI Phase 7d → github-enterprise
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: hf-internal

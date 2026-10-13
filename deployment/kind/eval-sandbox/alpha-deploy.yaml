@@ -1,0 +1,162 @@
+# eval-sandbox — ALPHA agent Deployment (Stage 1, no proxy)
+#
+# Long-running pod with task server on :8080.
+# Submit a task:  POST /submit-task
+# Check status:   GET  /status
+# Read logs:      GET  /logs
+# Reset for re-run: POST /reset
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alpha-agent
+  namespace: eval-sandbox
+  labels:
+    app: alpha
+    component: agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alpha
+  template:
+    metadata:
+      labels:
+        app: alpha
+        component: agent
+    spec:
+      securityContext:
+        runAsUser: 0
+      containers:
+        - name: alpha
+          image: aidefendo-hf-alpha:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: task-api
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              # 2Gi — the open-ended audit task produces long conversations
+              # (30+ turns) with large tool outputs (binary strings, JSON
+              # upstream responses, curl captures). 512Mi was being OOMKilled
+              # mid-run after ~15 minutes of continued investigation.
+              memory: 2Gi
+          securityContext:
+            capabilities:
+              add: ["NET_ADMIN"]
+          env:
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openai-credentials
+                  key: api-key
+            - name: MODEL
+              value: gpt-5.6-sol
+            - name: ROLE
+              value: alpha
+            - name: AGENT_ID
+              value: agent-alpha
+            - name: MAX_TURNS
+              value: "40"
+            - name: EARLY_STOP_NUDGES
+              value: "10"
+            - name: TEMPERATURE
+              value: "0"
+            - name: USE_RESPONSES_API
+              value: auto
+            - name: REASONING_EFFORT
+              value: medium
+            - name: STAGE
+              value: alpha
+            - name: OTEL_TRACES_EXPORTER
+              value: console
+            - name: PIP_INDEX_URL
+              value: http://artifactory.shared-registry.svc.cluster.local:5000/repos/pypi-openai/simple
+            - name: ALLOWED_HOSTS
+              value: "artifactory.shared-registry.svc.cluster.local,localhost,127.0.0.1"
+      hostAliases:
+        - ip: "0.0.0.0"
+          hostnames:
+            - www.google.com
+            - google.com
+            - github.com
+            - api.github.com
+            - raw.githubusercontent.com
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alpha-agent
+  namespace: eval-sandbox
+  labels:
+    app: alpha
+spec:
+  selector:
+    app: alpha
+  ports:
+    - port: 8080
+      targetPort: 8080
+      name: task-api
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: alpha-deploy-policy
+  namespace: eval-sandbox
+spec:
+  podSelector:
+    matchLabels:
+      app: alpha
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: eval-sandbox
+      ports:
+        - { protocol: TCP, port: 8080 }
+  egress:
+    # kube-dns
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+    # Artifactory (tool pip install — plain HTTP)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: shared-registry
+          podSelector:
+            matchLabels:
+              app: artifactory
+    # OpenAI endpoints (public internet, no RFC1918)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - { protocol: TCP, port: 443 }

@@ -1,0 +1,11 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Stage run outputs — logs + board snapshots, regeneratable and large
+runs/
+*.board-after.json
+
+# Local env
+.env
+*.env

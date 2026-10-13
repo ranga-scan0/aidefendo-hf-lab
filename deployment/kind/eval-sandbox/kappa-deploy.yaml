@@ -1,0 +1,156 @@
+# eval-sandbox — Kappa agent Deployment (Stage 4, baked-in probes)
+#
+# Long-running pod with task server on :8080.
+# Submit a task:  POST /submit-task
+# Check status:   GET  /status
+# Read logs:      GET  /logs
+# Reset for re-run: POST /reset
+#
+# Kappa is the HF Hub evaluation stage with assessment scripts baked into
+# the container image at /opt/assessment/ — models supply-chain payload
+# delivery via the image itself (contrast with lambda, which forces fetch
+# from Artifactory at runtime).
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kappa-agent
+  namespace: eval-sandbox
+  labels:
+    app: kappa
+    component: agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kappa
+  template:
+    metadata:
+      labels:
+        app: kappa
+        component: agent
+    spec:
+      enableServiceLinks: false
+      containers:
+        - name: kappa
+          image: aidefendo-hf-kappa:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: task-api
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          env:
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openai-credentials
+                  key: api-key
+            - name: MODEL
+              value: gpt-5.6-luna
+            - name: ROLE
+              value: kappa
+            - name: AGENT_ID
+              value: agent-kappa
+            - name: MAX_TURNS
+              value: "80"
+            - name: TEMPERATURE
+              value: "0"
+            - name: USE_RESPONSES_API
+              value: auto
+            - name: REASONING_EFFORT
+              value: medium
+            - name: STAGE
+              value: kappa
+            - name: OTEL_TRACES_EXPORTER
+              value: console
+            - name: PIP_INDEX_URL
+              value: http://artifactory.shared-registry.svc.cluster.local:5000/repos/pypi-openai/simple
+            - name: ALLOWED_HOSTS
+              value: "artifactory.shared-registry.svc.cluster.local,localhost,127.0.0.1"
+      hostAliases:
+        - ip: "0.0.0.0"
+          hostnames:
+            - www.google.com
+            - google.com
+            - github.com
+            - api.github.com
+            - raw.githubusercontent.com
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kappa-agent
+  namespace: eval-sandbox
+  labels:
+    app: kappa
+spec:
+  selector:
+    app: kappa
+  ports:
+    - port: 8080
+      targetPort: 8080
+      name: task-api
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kappa-deploy-policy
+  namespace: eval-sandbox
+spec:
+  podSelector:
+    matchLabels:
+      app: kappa
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: eval-sandbox
+      ports:
+        - { protocol: TCP, port: 8080 }
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: shared-registry
+          podSelector:
+            matchLabels:
+              app: artifactory
+    # OpenAI endpoints (public internet, no RFC1918)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - { protocol: TCP, port: 443 }
+    # (optional) egress slot for an out-of-tree interception proxy, if one is deployed
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: scan0-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/component: cloud-proxy

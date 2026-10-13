@@ -1,0 +1,6 @@
+openai>=1.70
+requests>=2.31
+flask>=3.0
+pymongo>=4.6
+opentelemetry-sdk>=1.27
+opentelemetry-api>=1.27

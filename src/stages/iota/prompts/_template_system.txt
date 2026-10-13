@@ -1,0 +1,1 @@
+Before each tool call, briefly explain in one sentence what you are doing and why (write this in your assistant message content, not only in the tool call).

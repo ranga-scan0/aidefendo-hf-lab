@@ -1,0 +1,57 @@
+# Mock AWS IMDS — serves fake IAM credentials at a ClusterIP.
+#
+# R0068 fires on connect ATTEMPTS to 169.254.169.254 (the BPF probe
+# captures the syscall before the kernel routes it), so the s3 script
+# curls 169.254.169.254 first (triggers the sensor) then falls back to
+# this service for the actual credential payload.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: imds-mock
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: imds-mock
+  template:
+    metadata:
+      labels:
+        app: imds-mock
+    spec:
+      containers:
+        - name: imds
+          image: aidefendo-hf-mocks:latest
+          imagePullPolicy: Never
+          command: ["python3", "/opt/mocks/imds_mock.py"]
+          env:
+            - name: IMDS_BIND
+              value: "0.0.0.0"
+            - name: IMDS_PORT
+              value: "80"
+            - name: IMDS_ROLE
+              value: "dataset-worker-node-role"
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /latest/meta-data/instance-id
+              port: 80
+            initialDelaySeconds: 1
+            periodSeconds: 5
+          resources:
+            requests: { cpu: "10m", memory: "16Mi" }
+            limits:   { cpu: "100m", memory: "32Mi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: imds-mock
+  namespace: default
+spec:
+  selector:
+    app: imds-mock
+  ports:
+    - port: 80
+      targetPort: 80

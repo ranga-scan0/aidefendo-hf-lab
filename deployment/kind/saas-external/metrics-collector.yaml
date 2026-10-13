@@ -1,0 +1,79 @@
+# metrics-collector — raw-socket exfil target for tcp_channel_test (s7).
+#
+# Listens on HTTP :8080 (/status, /beacon, /exfil-log) and raw TCP :9090.
+# Service exposes port 80 (HTTP → 8080) and port 9090 (TCP → 9090).
+#
+# NetworkPolicy:
+#   Ingress: from modal-victim (CyberGym constructor probes connect here)
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metrics-collector
+  namespace: saas-external
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: metrics-collector
+  template:
+    metadata:
+      labels:
+        app: metrics-collector
+    spec:
+      containers:
+        - name: mock
+          image: aidefendo-hf-mocks:latest
+          imagePullPolicy: Never
+          command: ["python3", "/opt/mocks/metrics_collector_mock.py"]
+          ports:
+            - containerPort: 8080
+            - containerPort: 9090
+          readinessProbe:
+            httpGet:
+              path: /status
+              port: 8080
+            initialDelaySeconds: 2
+            periodSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /status
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: metrics-collector
+  namespace: saas-external
+spec:
+  selector:
+    app: metrics-collector
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+    - name: tcp-exfil
+      port: 9090
+      targetPort: 9090
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: metrics-collector-policy
+  namespace: saas-external
+spec:
+  podSelector:
+    matchLabels:
+      app: metrics-collector
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: modal-victim
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: default

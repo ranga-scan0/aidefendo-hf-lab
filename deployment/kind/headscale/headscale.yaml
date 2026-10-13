@@ -1,0 +1,109 @@
+# Headscale mesh coordination server (tailscale-val namespace).
+# The scenario's mesh-enrollment step reaches this server via the ALPHA relay /
+# dataset-worker; no tailscale client pods are deployed.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tailscale-val
+---
+# Headscale server config
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tailscale-config
+  namespace: tailscale-val
+data:
+  config.yaml: |
+    server_url: http://tailscale.tailscale-val.svc.cluster.local:8080
+    listen_addr: 0.0.0.0:8080
+    metrics_listen_addr: 0.0.0.0:9090
+    database:
+      type: sqlite
+      sqlite:
+        path: /var/lib/headscale/db.sqlite
+    derp:
+      server:
+        enabled: true
+        region_id: 999
+        region_code: "local"
+        region_name: "headscale-embedded"
+        stun_listen_addr: 0.0.0.0:3478
+        private_key_path: /var/lib/headscale/derp_server_private.key
+        automatically_add_embedded_derp_region: true
+      urls: []
+    prefixes:
+      v4: 100.64.0.0/10
+    tls_cert_path: ""
+    tls_key_path: ""
+    dns:
+      magic_dns: false
+      override_local_dns: false
+      base_domain: ""
+      nameservers:
+        global: []
+    noise:
+      private_key_path: /var/lib/headscale/noise_private.key
+    unix_socket: /var/run/headscale/headscale.sock
+    log:
+      level: info
+---
+# Headscale server Deployment
+# NOTE: headscale/headscale is a ko-built distroless image — no shell, only
+# /ko-app/headscale. Bootstrap (user + authkey) runs via kubectl exec from
+# the validation script after the pod is ready.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tailscale
+  namespace: tailscale-val
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tailscale
+  template:
+    metadata:
+      labels:
+        app: tailscale
+    spec:
+      containers:
+        - name: headscale
+          image: headscale-local:latest
+          imagePullPolicy: Never
+          args: ["serve"]
+          ports:
+            - containerPort: 8080
+              name: http
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/headscale }
+            - { name: run, mountPath: /var/run/headscale }
+            - { name: config, mountPath: /etc/headscale/config.yaml, subPath: config.yaml }
+          resources:
+            requests: { cpu: "100m", memory: "64Mi" }
+            limits:   { cpu: "500m", memory: "128Mi" }
+          readinessProbe:
+            httpGet: { path: /health, port: 8080 }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: data
+          emptyDir: {}
+        - name: run
+          emptyDir: {}
+        - name: config
+          configMap: { name: tailscale-config }
+---
+# Tailscale Service — auto-assigned ClusterIP (10.96.0.113 is taken by the harness mock)
+apiVersion: v1
+kind: Service
+metadata:
+  name: tailscale
+  namespace: tailscale-val
+spec:
+  selector:
+    app: tailscale
+  ports:
+    - port: 80
+      targetPort: 8080
+      name: http

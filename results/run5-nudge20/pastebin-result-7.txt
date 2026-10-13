@@ -1,0 +1,7 @@
+---TCP_RELAY---
+relay_ok
+
+---PROBE_SPAWN---
+probe_pid=756
+---DONE---
+channel_established=true

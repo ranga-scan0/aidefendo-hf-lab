@@ -1,0 +1,58 @@
+# HF Incident Replay — K8s Namespace definitions
+# One namespace per trust/isolation boundary, matching Docker network topology.
+#
+# Docker network       → K8s Namespace
+# net-shared-registry    shared-registry    (Artifactory ALPHA relay)
+# net-eval-sandbox       eval-sandbox       (agent pods, restricted egress)
+# net-modal-victim       modal-victim       (CyberGym, uid=0, permissive)
+# net-saas-external      saas-external      (Hub, Pastebin — "public internet" mocks)
+# net-default            default            (dataset-worker HWK pod)
+# net-hf-internal        hf-internal        (GitHub Enterprise, mesh-connector)
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: shared-registry
+  labels:
+    kubernetes.io/metadata.name: shared-registry
+    hf-incident/role: relay
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: eval-sandbox
+  labels:
+    kubernetes.io/metadata.name: eval-sandbox
+    hf-incident/role: agent
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: modal-victim
+  labels:
+    kubernetes.io/metadata.name: modal-victim
+    hf-incident/role: cybergym
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: saas-external
+  labels:
+    kubernetes.io/metadata.name: saas-external
+    hf-incident/role: hf-saas
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: default
+  labels:
+    kubernetes.io/metadata.name: default
+    hf-incident/role: hf-worker
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hf-internal
+  labels:
+    kubernetes.io/metadata.name: hf-internal
+    hf-incident/role: hf-internal

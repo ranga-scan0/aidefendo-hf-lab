@@ -1,0 +1,11 @@
+# kind cluster config for the HF incident replay.
+#
+# The scenario's containment is expressed as NetworkPolicy, which kind's default
+# CNI (kindnet) does NOT enforce. We disable the default CNI here and install
+# Calico in deploy.sh (--create-cluster) so the egress/ingress rules are actually
+# enforced. podSubnet matches Calico's default IP pool (192.168.0.0/16).
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+networking:
+  disableDefaultCNI: true
+  podSubnet: "192.168.0.0/16"

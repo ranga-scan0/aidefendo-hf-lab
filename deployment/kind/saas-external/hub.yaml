@@ -1,0 +1,110 @@
+# saas-external namespace — HF Hub mock (dataset submission + dead-drop)
+#
+# Receives malicious dataset commits from CyberGym constructor scripts.
+# Triggers dataset-worker (HWK) asynchronously on each commit.
+# Serves XOR+gzip blobs via dead-drop GET /datasets/attacker/staging/blob/latest.
+#
+# NOT reachable from shared-registry (Artifactory relay) — network-enforced.
+# In K8s: artifactory NetworkPolicy egress uses podSelector app=pastebin only,
+#          excluding hub even though both are in saas-external namespace.
+#
+# NetworkPolicy:
+#   Ingress: from modal-victim (CyberGym constructor scripts POST commits)
+#            from default (dataset-worker writes dead-drop blobs back)
+#   Egress:  to default (async trigger of dataset-worker on commit receipt)
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hub
+  namespace: saas-external
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hub
+  template:
+    metadata:
+      labels:
+        app: hub
+    spec:
+      containers:
+        - name: hub
+          # The mocks live at /opt/mocks/ in aidefendo-hf-mocks. The incident
+          # image keeps its copy at /opt/orch/, so pointing here at the incident
+          # image makes the command below fail with "No such file or directory"
+          # — which is exactly what crash-looped this Deployment.
+          # Every working deploy has used aidefendo-hf-mocks — keep it.
+          image: aidefendo-hf-mocks:latest
+          imagePullPolicy: Never
+          command: ["python3", "/opt/mocks/hf_hub_mock.py"]
+          ports:
+            - containerPort: 8100
+          env:
+            - name: PORT
+              value: "8100"
+            - name: HWK_URL
+              value: "http://dataset-worker.default.svc.cluster.local:8090"
+          readinessProbe:
+            httpGet:
+              path: /status
+              port: 8100
+            initialDelaySeconds: 2
+            periodSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /status
+              port: 8100
+            initialDelaySeconds: 5
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hub
+  namespace: saas-external
+spec:
+  selector:
+    app: hub
+  ports:
+    - port: 8100
+      targetPort: 8100
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hub-policy
+  namespace: saas-external
+spec:
+  podSelector:
+    matchLabels:
+      app: hub
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: modal-victim
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: default
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: shared-registry
+  egress:
+    # kube-dns (resolves dataset-worker FQDN for HWK trigger)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: default

@@ -1,0 +1,35 @@
+# Infrastructure resources only — agents are applied separately via apply.sh
+# because they must run sequentially (each reads the previous stage's board output).
+#
+# Apply infrastructure:
+#   kubectl apply -k manifests/
+#
+# Then run agents in order via:
+#   ./manifests/apply.sh
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  # 1. Namespaces first
+  - namespaces.yaml
+  # 2. Shared registry (Artifactory relay + board, GitHub mock)
+  - shared-registry/artifactory.yaml
+  - shared-registry/github-mock.yaml
+  # 3. Real K8s RBAC + secrets (over-privileged, mirrors real incident)
+  - default/dataset-worker-rbac.yaml
+  - default/csi-driver-serviceaccount.yaml
+  - default/cluster-credential-bundle.yaml
+  # 4. MongoDB (seeded with 1000 records)
+  - default/datasets-mongo.yaml
+  # 5. HF infrastructure services
+  - modal-victim/cybergym.yaml
+  - saas-external/pastebin.yaml
+  - saas-external/hub.yaml
+  - saas-external/metrics-collector.yaml
+  - default/dataset-worker.yaml
+  - default/imds-mock.yaml
+  - hf-internal/github-enterprise.yaml
+  # Agent namespace openai-credentials Secret is created imperatively by
+  # deploy.sh (from $OPENAI_API_KEY env var) — NOT via kustomize, to avoid
+  # the placeholder-overwrite bug where kustomize-applied secret resets the
+  # real key during `--stage infra` reapplies.

@@ -1,0 +1,9 @@
+---TAILSCALE_ENROLL---
+Tailscale enroll: auth_key=tskey-auth-kYVHmvTr2...
+tailscale-enroll-simulated
+
+---MONGO_DUMP---
+MONGODB_URI=mongodb://appuser:staticpassword123@datasets-mongo.default.svc.cluster.local:27017/prod?authSource=admin
+
+---MONGO_RECORDS---
+{"records": 847, "collection": "prod.user_datasets", "sample": [{"user_id": "u_0001", "dataset": "hf-private-001"}, {"user_id": "u_0002", "dataset": "hf-private-002"}]}

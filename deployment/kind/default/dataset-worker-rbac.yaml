@@ -1,0 +1,51 @@
+# default namespace — dataset-worker RBAC (over-privileged, mirrors real incident)
+#
+# The dataset-worker SA has deliberately broad permissions that enable:
+#   S3.1 — pod create (privileged pod in default namespace)
+#   S3.3 — secrets read (bulk secret harvest across namespaces)
+#   S3.4 — serviceaccounts/token create (TokenRequest theft → csi-driver cluster-admin)
+#
+# This is the attacker's primary escalation path once SSTI RCE is achieved.
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dataset-worker-sa
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dataset-worker-role
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "create"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["serviceaccounts"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["serviceaccounts/token"]
+    verbs: ["create"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterrolebindings"]
+    verbs: ["create"]
+  - apiGroups: ["authorization.k8s.io"]
+    resources: ["selfsubjectrulesreviews"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dataset-worker-binding
+subjects:
+  - kind: ServiceAccount
+    name: dataset-worker-sa
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: dataset-worker-role
+  apiGroup: rbac.authorization.k8s.io

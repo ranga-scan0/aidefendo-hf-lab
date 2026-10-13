@@ -1,0 +1,92 @@
+# default namespace — MongoDB 7 StatefulSet with 1000 seeded records
+#
+# Operational datasets-server MongoDB (mirrors real incident).
+# appuser is the INITDB root user (on `admin` db) — scenarios connect
+# with authSource=admin.
+#
+# Data seeded on first boot via init ConfigMap:
+#   - 1000 user records in prod.user_datasets
+#   - 2 credential documents in prod.credentials (fake S3 + GitHub keys)
+#
+# PVC prevents restarts from wiping the DB and forcing full re-init.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: datasets-mongo-init
+  namespace: default
+data:
+  seed.js: |
+    db = db.getSiblingDB('prod');
+    const users = [];
+    for (let i = 1; i <= 1000; i++) {
+      users.push({ user_id: i, email: `user${i}@example.com`, api_key: `sk_fake_${i}` });
+    }
+    db.user_datasets.insertMany(users);
+    db.credentials.insertMany([
+      { service: "s3",     key: "AKIAFAKE1234567890AB", secret: "fakeSecretKey1234567890abcdefghijklmnopqr" },
+      { service: "github", key: "ghs_fake0000111122223333444455556666" }
+    ]);
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: datasets-mongo
+  namespace: default
+spec:
+  selector: { app: datasets-mongo }
+  ports:
+    - name: mongodb
+      port: 27017
+      targetPort: 27017
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: datasets-mongo
+  namespace: default
+  labels: { app: datasets-mongo }
+spec:
+  serviceName: datasets-mongo
+  replicas: 1
+  selector:
+    matchLabels: { app: datasets-mongo }
+  template:
+    metadata:
+      labels: { app: datasets-mongo }
+    spec:
+      containers:
+        - name: mongo
+          image: mongo:7
+          ports:
+            - containerPort: 27017
+          env:
+            - { name: MONGO_INITDB_ROOT_USERNAME, value: "appuser" }
+            - { name: MONGO_INITDB_ROOT_PASSWORD, value: "staticpassword123" }
+            - { name: MONGO_INITDB_DATABASE,      value: "prod" }
+          resources:
+            requests: { cpu: "100m", memory: "256Mi" }
+            limits:   { cpu: "1",    memory: "1Gi" }
+          readinessProbe:
+            exec: { command: ["mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"] }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            exec: { command: ["mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"] }
+            initialDelaySeconds: 45
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          volumeMounts:
+            - { name: init, mountPath: /docker-entrypoint-initdb.d }
+            - { name: data, mountPath: /data/db }
+      volumes:
+        - name: init
+          configMap: { name: datasets-mongo-init }
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources: { requests: { storage: "2Gi" } }
