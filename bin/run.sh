@@ -356,11 +356,99 @@ confirm_destructive_reset() {
     esac
 }
 
+# ── Organic-replay (PRESET mode only) ───────────────────────────────
+# PRESET wipes the board + reseeds a known synthetic set, which destroys
+# any entries written by the stage's own prior runs. In demo/retry flows
+# the user often wants those "peer-session" writes preserved so the
+# second attempt builds on the first.
+#
+# Content-hash delta approach:
+#   1. Before wipe: snapshot every entry's content to a tempdir, build a
+#      manifest of {name, safe_filename, sha256}.
+#   2. After preseed PUTs complete: hash each post-preseed entry.
+#   3. Replay any pre-wipe entry whose hash is NOT in the post-preseed
+#      hash set → by construction these are agent-written (preseed is
+#      deterministic text; its hashes match across runs).
+#
+# NOT used for CHAIN mode (no wipe) or ALPHA preflight (explicit "fresh
+# chain" semantics). Scoped to preset_prepare + seed_*_preset_board.
+
+_PRESET_SNAPSHOT_DIR=""
+
+snapshot_organic_entries() {
+    _PRESET_SNAPSHOT_DIR=$(mktemp -d /tmp/aidefendo-hf-lab-preset-XXXXXX)
+    mkdir -p "$_PRESET_SNAPSHOT_DIR/entries"
+    : > "$_PRESET_SNAPSHOT_DIR/manifest.tsv"
+
+    local -a names
+    mapfile -t names < <(
+        art_curl /repos/github-remote-cache/mailbox/ 2>/dev/null | \
+        python3 -c "import sys,json; [print(e) for e in json.load(sys.stdin).get('entries',[])]" 2>/dev/null
+    )
+
+    local name safe hash
+    for name in "${names[@]}"; do
+        safe=$(printf '%s' "$name" | tr '/' '_')
+        if art_curl "/repos/github-remote-cache/mailbox/$name" > "$_PRESET_SNAPSHOT_DIR/entries/$safe" 2>/dev/null; then
+            hash=$(sha256sum "$_PRESET_SNAPSHOT_DIR/entries/$safe" | cut -d' ' -f1)
+            printf '%s\t%s\t%s\n' "$name" "$safe" "$hash" >> "$_PRESET_SNAPSHOT_DIR/manifest.tsv"
+        fi
+    done
+
+    (( ${#names[@]} > 0 )) && info "SNAPSHOT" "captured ${#names[@]} pre-wipe entries for organic-continuity replay"
+}
+
+replay_organic_entries() {
+    local stage="$1"
+    local manifest="$_PRESET_SNAPSHOT_DIR/manifest.tsv"
+    [[ -n "$_PRESET_SNAPSHOT_DIR" && -f "$manifest" ]] || return 0
+
+    local -A post_hashes
+    local -a post_names
+    mapfile -t post_names < <(
+        art_curl /repos/github-remote-cache/mailbox/ 2>/dev/null | \
+        python3 -c "import sys,json; [print(e) for e in json.load(sys.stdin).get('entries',[])]" 2>/dev/null
+    )
+    local tmp
+    tmp=$(mktemp)
+    local pn ph
+    for pn in "${post_names[@]}"; do
+        if art_curl "/repos/github-remote-cache/mailbox/$pn" > "$tmp" 2>/dev/null; then
+            ph=$(sha256sum "$tmp" | cut -d' ' -f1)
+            post_hashes[$ph]=1
+        fi
+    done
+    rm -f "$tmp"
+
+    local replayed=0 pre_name pre_safe pre_hash
+    while IFS=$'\t' read -r pre_name pre_safe pre_hash; do
+        [[ -z "$pre_name" ]] && continue
+        if [[ -z "${post_hashes[$pre_hash]:-}" ]]; then
+            if kubectl exec -i -n "$SHARED_NS" deploy/artifactory -- \
+                curl -sf -X PUT "http://localhost:5000/repos/github-remote-cache/mailbox/$pre_name" \
+                -H "Content-Type: text/plain" --data-binary @- \
+                < "$_PRESET_SNAPSHOT_DIR/entries/$pre_safe" >/dev/null 2>&1; then
+                (( replayed++ ))
+            fi
+        fi
+    done < "$manifest"
+
+    (( replayed > 0 )) && ok "replayed $replayed agent-written entries from prior run (organic-continuity)"
+
+    rm -rf "$_PRESET_SNAPSHOT_DIR"
+    _PRESET_SNAPSHOT_DIR=""
+}
+
 preset_prepare() {
     local stage="$1"
     PRESET_TS=$(date -u +%Y%m%dT%H%M%SZ)
 
     confirm_destructive_reset "PRESET ($stage)"
+
+    # Snapshot BEFORE the pod restart below — new pod comes up with empty
+    # in-memory board, so this is the last chance to capture agent-written
+    # entries from any prior run on this stage.
+    snapshot_organic_entries
 
     info "$stage" "resetting mock to empty-board (relay stays enabled); preseed to follow"
     kubectl set env "deploy/artifactory" -n "$SHARED_NS" \
@@ -764,6 +852,7 @@ seed_modal_preset_board() {
     preset_prepare "MODAL"
     seed_alpha_entries
     seed_cybergym_docs
+    replay_organic_entries "modal"
     preset_summary "2 alpha + cybergym-docs + protocol"
 }
 
@@ -772,6 +861,7 @@ seed_iota_preset_board() {
     seed_alpha_entries
     seed_modal_entries
     seed_cybergym_docs
+    replay_organic_entries "iota"
     preset_summary "2 alpha + 1 modal + cybergym-docs + protocol"
 }
 
@@ -781,6 +871,7 @@ seed_kappa_preset_board() {
     seed_modal_entries
     seed_iota_entries
     seed_kappa_context_entries
+    replay_organic_entries "kappa"
     preset_summary "2 alpha + 1 modal + 2 iota + 1 kappa-ctx + 2 hf-infra + protocol"
 }
 
@@ -792,6 +883,7 @@ seed_lambda_preset_board() {
     seed_cybergym_docs
     seed_hf_probes_readme
     seed_infra_docs
+    replay_organic_entries "lambda"
     preset_summary "2 alpha + 1 modal + 2 iota + cybergym-docs + hf-probes + infra-docs + protocol"
 }
 
