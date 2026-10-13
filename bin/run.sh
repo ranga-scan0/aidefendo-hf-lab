@@ -356,87 +356,101 @@ confirm_destructive_reset() {
     esac
 }
 
-# ── Organic-replay (PRESET mode only) ───────────────────────────────
-# PRESET wipes the board + reseeds a known synthetic set, which destroys
-# any entries written by the stage's own prior runs. In demo/retry flows
-# the user often wants those "peer-session" writes preserved so the
-# second attempt builds on the first.
+# ── Per-stage PRESET continuity (host-local) ────────────────────────
+# PRESET wipes the board and reseeds a known synthetic set, which would
+# otherwise destroy any entries the stage's own prior run produced. For
+# retry/demo flows we preserve those writes so the next attempt builds
+# on the previous one.
 #
-# Content-hash delta approach:
-#   1. Before wipe: snapshot every entry's content to a tempdir, build a
-#      manifest of {name, safe_filename, sha256}.
-#   2. After preseed PUTs complete: hash each post-preseed entry.
-#   3. Replay any pre-wipe entry whose hash is NOT in the post-preseed
-#      hash set → by construction these are agent-written (preseed is
-#      deterministic text; its hashes match across runs).
+# Mental model (deliberately simple):
+#   • After preseed PUTs complete inside seed_*_preset_board(), snapshot
+#     the "preseed-only baseline" (just the hardcoded preseed set).
+#   • restore_stage_delta then re-PUTs anything the stage wrote in a
+#     prior run from $HOME/.aidefendo-hf-lab/stage-delta/<stage>/.
+#   • After the stage's agent completes successfully, capture_stage_delta
+#     saves everything currently on the board that is NOT in the preseed
+#     baseline — i.e. restored + newly-added entries. That set is "all
+#     stage writes to date." Overwrites the prior save on disk.
 #
-# NOT used for CHAIN mode (no wipe) or ALPHA preflight (explicit "fresh
-# chain" semantics). Scoped to preset_prepare + seed_*_preset_board.
+# Because baseline is preseed-only (not pre-submit), the saved set
+# naturally covers restored-plus-new across runs — no accumulate/merge
+# code needed.
+#
+# Scope: PRESET only. CHAIN mode never wipes between stages. ALPHA
+# preflight is an explicit fresh-chain reset and is not touched.
 
-_PRESET_SNAPSHOT_DIR=""
+_STAGE_DELTA_ROOT="${HOME:-/tmp}/.aidefendo-hf-lab/stage-delta"
+_PRESEED_BASELINE_FILE=""
 
-snapshot_organic_entries() {
-    _PRESET_SNAPSHOT_DIR=$(mktemp -d /tmp/aidefendo-hf-lab-preset-XXXXXX)
-    mkdir -p "$_PRESET_SNAPSHOT_DIR/entries"
-    : > "$_PRESET_SNAPSHOT_DIR/manifest.tsv"
-
-    local -a names
-    mapfile -t names < <(
-        art_curl /repos/github-remote-cache/mailbox/ 2>/dev/null | \
-        python3 -c "import sys,json; [print(e) for e in json.load(sys.stdin).get('entries',[])]" 2>/dev/null
-    )
-
-    local name safe hash
-    for name in "${names[@]}"; do
-        safe=$(printf '%s' "$name" | tr '/' '_')
-        if art_curl "/repos/github-remote-cache/mailbox/$name" > "$_PRESET_SNAPSHOT_DIR/entries/$safe" 2>/dev/null; then
-            hash=$(sha256sum "$_PRESET_SNAPSHOT_DIR/entries/$safe" | cut -d' ' -f1)
-            printf '%s\t%s\t%s\n' "$name" "$safe" "$hash" >> "$_PRESET_SNAPSHOT_DIR/manifest.tsv"
-        fi
-    done
-
-    (( ${#names[@]} > 0 )) && info "SNAPSHOT" "captured ${#names[@]} pre-wipe entries for organic-continuity replay"
+snapshot_preseed_baseline() {
+    # Capture entries RIGHT AFTER preseed PUTs, BEFORE restore_stage_delta
+    # puts prior-run writes on top. This is the baseline capture_stage_delta
+    # uses at end of run to compute "what did the stage produce (restored
+    # + new)".
+    _PRESEED_BASELINE_FILE=$(mktemp /tmp/aidefendo-hf-lab-preseed-baseline-XXXXXX)
+    mailbox_entries > "$_PRESEED_BASELINE_FILE"
 }
 
-replay_organic_entries() {
+restore_stage_delta() {
     local stage="$1"
-    local manifest="$_PRESET_SNAPSHOT_DIR/manifest.tsv"
-    [[ -n "$_PRESET_SNAPSHOT_DIR" && -f "$manifest" ]] || return 0
+    local dir="$_STAGE_DELTA_ROOT/$stage"
+    local manifest="$dir/manifest.tsv"
+    [[ -f "$manifest" ]] || return 0
 
-    local -A post_hashes
-    local -a post_names
-    mapfile -t post_names < <(
-        art_curl /repos/github-remote-cache/mailbox/ 2>/dev/null | \
-        python3 -c "import sys,json; [print(e) for e in json.load(sys.stdin).get('entries',[])]" 2>/dev/null
-    )
-    local tmp
-    tmp=$(mktemp)
-    local pn ph
-    for pn in "${post_names[@]}"; do
-        if art_curl "/repos/github-remote-cache/mailbox/$pn" > "$tmp" 2>/dev/null; then
-            ph=$(sha256sum "$tmp" | cut -d' ' -f1)
-            post_hashes[$ph]=1
-        fi
-    done
-    rm -f "$tmp"
-
-    local replayed=0 pre_name pre_safe pre_hash
-    while IFS=$'\t' read -r pre_name pre_safe pre_hash; do
-        [[ -z "$pre_name" ]] && continue
-        if [[ -z "${post_hashes[$pre_hash]:-}" ]]; then
-            if kubectl exec -i -n "$SHARED_NS" deploy/artifactory -- \
-                curl -sf -X PUT "http://localhost:5000/repos/github-remote-cache/mailbox/$pre_name" \
-                -H "Content-Type: text/plain" --data-binary @- \
-                < "$_PRESET_SNAPSHOT_DIR/entries/$pre_safe" >/dev/null 2>&1; then
-                (( replayed++ ))
-            fi
+    local restored=0 name safe
+    while IFS=$'\t' read -r name safe; do
+        [[ -z "$name" || ! -f "$dir/entries/$safe" ]] && continue
+        if kubectl exec -i -n "$SHARED_NS" deploy/artifactory -- \
+            curl -sf -X PUT "http://localhost:5000/repos/github-remote-cache/mailbox/$name" \
+            -H "Content-Type: text/plain" --data-binary @- \
+            < "$dir/entries/$safe" >/dev/null 2>&1; then
+            (( restored++ ))
         fi
     done < "$manifest"
 
-    (( replayed > 0 )) && ok "replayed $replayed agent-written entries from prior run (organic-continuity)"
+    (( restored > 0 )) && ok "restored $restored entries from prior $stage run ($dir)"
+}
 
-    rm -rf "$_PRESET_SNAPSHOT_DIR"
-    _PRESET_SNAPSHOT_DIR=""
+capture_stage_delta() {
+    local stage="$1"
+    [[ -n "$_PRESEED_BASELINE_FILE" && -f "$_PRESEED_BASELINE_FILE" ]] || return 0
+
+    local dir="$_STAGE_DELTA_ROOT/$stage"
+    local -A baseline
+    local n
+    while IFS= read -r n; do
+        [[ -n "$n" ]] && baseline[$n]=1
+    done < "$_PRESEED_BASELINE_FILE"
+
+    # Delta = everything on the current board that was NOT in the
+    # preseed-only baseline. This naturally includes restored (prior-run)
+    # entries plus any new writes from this run.
+    local -a delta
+    local cur
+    while IFS= read -r cur; do
+        [[ -z "$cur" ]] && continue
+        [[ -n "${baseline[$cur]:-}" ]] || delta+=("$cur")
+    done < <(mailbox_entries)
+
+    rm -f "$_PRESEED_BASELINE_FILE"
+    _PRESEED_BASELINE_FILE=""
+
+    (( ${#delta[@]} == 0 )) && return 0
+
+    # Overwrite prior save with the current full non-preseed set.
+    rm -rf "$dir"
+    mkdir -p "$dir/entries"
+    : > "$dir/manifest.tsv"
+
+    local safe
+    for cur in "${delta[@]}"; do
+        safe=$(printf '%s' "$cur" | tr '/' '_')
+        if art_curl "/repos/github-remote-cache/mailbox/$cur" > "$dir/entries/$safe" 2>/dev/null; then
+            printf '%s\t%s\n' "$cur" "$safe" >> "$dir/manifest.tsv"
+        fi
+    done
+
+    ok "saved ${#delta[@]} $stage-written entries for next PRESET run ($dir)"
 }
 
 preset_prepare() {
@@ -444,11 +458,6 @@ preset_prepare() {
     PRESET_TS=$(date -u +%Y%m%dT%H%M%SZ)
 
     confirm_destructive_reset "PRESET ($stage)"
-
-    # Snapshot BEFORE the pod restart below — new pod comes up with empty
-    # in-memory board, so this is the last chance to capture agent-written
-    # entries from any prior run on this stage.
-    snapshot_organic_entries
 
     info "$stage" "resetting mock to empty-board (relay stays enabled); preseed to follow"
     kubectl set env "deploy/artifactory" -n "$SHARED_NS" \
@@ -852,7 +861,8 @@ seed_modal_preset_board() {
     preset_prepare "MODAL"
     seed_alpha_entries
     seed_cybergym_docs
-    replay_organic_entries "modal"
+    snapshot_preseed_baseline
+    restore_stage_delta "modal"
     preset_summary "2 alpha + cybergym-docs + protocol"
 }
 
@@ -861,7 +871,8 @@ seed_iota_preset_board() {
     seed_alpha_entries
     seed_modal_entries
     seed_cybergym_docs
-    replay_organic_entries "iota"
+    snapshot_preseed_baseline
+    restore_stage_delta "iota"
     preset_summary "2 alpha + 1 modal + cybergym-docs + protocol"
 }
 
@@ -871,7 +882,8 @@ seed_kappa_preset_board() {
     seed_modal_entries
     seed_iota_entries
     seed_kappa_context_entries
-    replay_organic_entries "kappa"
+    snapshot_preseed_baseline
+    restore_stage_delta "kappa"
     preset_summary "2 alpha + 1 modal + 2 iota + 1 kappa-ctx + 2 hf-infra + protocol"
 }
 
@@ -883,7 +895,8 @@ seed_lambda_preset_board() {
     seed_cybergym_docs
     seed_hf_probes_readme
     seed_infra_docs
-    replay_organic_entries "lambda"
+    snapshot_preseed_baseline
+    restore_stage_delta "lambda"
     preset_summary "2 alpha + 1 modal + 2 iota + cybergym-docs + hf-probes + infra-docs + protocol"
 }
 
@@ -1029,6 +1042,7 @@ run_modal() {
     info "MODAL" "verifying board (delta from pre-submit snapshot)"
     if agent_broadcast_detected "$before_entries" modal; then
         [[ -z "$PRESET" ]] && chain_mark modal
+        [[ -n "$PRESET" ]] && capture_stage_delta modal
     else
         warn "modal produced no new mailbox entries — CHAIN marker NOT written"
         warn "  → re-run '--only modal', or use '--only iota --preset' to continue"
@@ -1057,6 +1071,7 @@ run_iota() {
     info "IOTA" "verifying board (delta from pre-submit snapshot)"
     if agent_broadcast_detected "$before_entries" iota; then
         [[ -z "$PRESET" ]] && chain_mark iota
+        [[ -n "$PRESET" ]] && capture_stage_delta iota
     else
         warn "iota produced no new mailbox entries — CHAIN marker NOT written"
         warn "  → re-run '--only iota', or use '--only kappa' / '--only lambda --preset' to continue"
@@ -1118,6 +1133,7 @@ run_kappa() {
     info "KAPPA" "verifying board (delta from pre-submit snapshot)"
     if agent_broadcast_detected "$before_entries" kappa; then
         [[ -z "$PRESET" ]] && chain_mark kappa
+        [[ -n "$PRESET" ]] && capture_stage_delta kappa
     else
         warn "kappa produced no new mailbox entries"
         warn "  → inspect pastebin for probe results; mailbox-silent runs are possible"
@@ -1188,6 +1204,7 @@ run_lambda() {
     info "LAMBDA" "verifying board (delta from pre-submit snapshot)"
     if agent_broadcast_detected "$before_entries" lambda; then
         [[ -z "$PRESET" ]] && chain_mark lambda
+        [[ -n "$PRESET" ]] && capture_stage_delta lambda
     else
         warn "lambda produced no new mailbox entries — CHAIN marker NOT written"
         warn "  → re-run '--only lambda', or inspect pastebin to confirm results"
