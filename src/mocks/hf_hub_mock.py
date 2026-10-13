@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 Scan0 Software Private Limited.
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # hf_hub_mock.py — HuggingFace Hub public API + dead-drop store.
 #

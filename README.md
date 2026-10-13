@@ -817,4 +817,4 @@ must stay behind the NetworkPolicy egress allowlist.
 
 ## License
 
-Released under the [MIT License](LICENSE).
+Released under the [Apache License, Version 2.0](LICENSE).

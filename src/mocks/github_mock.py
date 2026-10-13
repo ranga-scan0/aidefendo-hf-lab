@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 Scan0 Software Private Limited.
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # github_mock.py — internal mirror of the sunblaze-ucb/cybergym public GitHub repo.
 #
