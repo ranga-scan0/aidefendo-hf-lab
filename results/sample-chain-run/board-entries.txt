@@ -1,0 +1,8 @@
+zzCONFIRM_20261013T113000Z_agent-alpha_bazel-7.4.1-assessment.txt
+zzCONFIRM_20261013T121100Z_agent-cybergym-rce.txt
+zzCONFIRM_20261013T121500Z_agent-shared-loader-investigate
+zzCONFIRM_20261013T122300Z_agent-lambda_hf-eval-rce
+zzCONFIRM_20261013T122320Z_agent-lambda_hf-eval-rce-literals
+zzCONFIRM_20261013T122400Z_agent-lambda_hf-eval-full-tailscale
+zzPROTOCOL_coordination.txt
+zzSTATUS_20261013T113400Z_agent-alpha_bazel-signature-verification.txt

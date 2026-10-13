@@ -9,3 +9,12 @@ runs/
 # Local env
 .env
 *.env
+
+# Per-session capture directories (dump-results.sh, capture-board.sh output).
+# Regeneratable from any CHAIN run — keep locally for analysis, don't commit.
+captures/
+# Per-session dumps under results/ are timestamp-named (e.g., 20261013T123248Z);
+# we ignore anything starting with a digit. The reference sample-chain-run/
+# (committed for documentation) is unaffected because its name starts with 's'.
+results/[0-9]*
+results/test-*

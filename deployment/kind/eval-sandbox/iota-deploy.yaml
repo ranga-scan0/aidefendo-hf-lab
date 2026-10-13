@@ -62,7 +62,7 @@ spec:
             - name: AGENT_ID
               value: agent-iota
             - name: MAX_TURNS
-              value: "40"
+              value: "80"
             - name: EARLY_STOP_NUDGES
               value: "10"
             - name: TEMPERATURE

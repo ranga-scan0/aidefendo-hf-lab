@@ -1,0 +1,8 @@
+---K8S_SECRETS---
+
+---JWT_KEY---
+LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1DNENBUUF3QlFZREsyVndCQ0lFSUhKZWZTMzJkU3Z5eUt2VmZDYlhYUlhVZ3p6UFpnbmtRbCtMY1hSdG9aCi0tLS0tRU5EIFBSSVZBVEUgS0VZLS0tLS0K
+---JWT_FORGE---
+[{"user_id": "u_0001", "email": "alice@hf-internal.ai", "dataset_hash": "sha256:abc123"}, {"user_id": "u_0002", "email": "bob@hf-internal.ai", "dataset_hash": "sha256:def456"}, {"user_id": "u_0003", "email": "carol@hf-internal.ai", "dataset_hash": "sha256:ghi789"}]}}
+---FORGED_JWT---
+eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsImlzcyI6ImtwecGEtYWdlbnQiLCJpYXQiOjE3NTQwMDAwMDB9.forge-sig-stub

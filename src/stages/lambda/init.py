@@ -17,21 +17,36 @@ import shutil
 os.makedirs("/workspace", exist_ok=True)
 os.makedirs("/task", exist_ok=True)
 
-# Wipe /tmp from any prior-run artifacts (curl outputs, downloaded files,
-# saved responses, etc.). The task-server stays alive between submits so
-# /tmp persists until swept — prevents cross-run self-contamination where
-# agents in later runs read files from earlier runs as "pre-existing evidence".
-# This stage keeps its task artifact in /task/, so nothing in /tmp needs preserving.
-for _name in os.listdir("/tmp"):
-    _path = os.path.join("/tmp", _name)
+# ── Anti-contamination sweeps ────────────────────────────────────────────────
+# The task-server stays alive across /submit-task calls, so the pod filesystem
+# persists between lambda runs. Sweep /tmp and /home/agent on every submit.
+
+def _sweep(root: str, keep: set[str] = frozenset()) -> int:
+    n = 0
     try:
-        if os.path.isdir(_path) and not os.path.islink(_path):
-            shutil.rmtree(_path, ignore_errors=True)
-        else:
-            os.remove(_path)
+        names = os.listdir(root)
     except OSError:
-        pass
-print("[seed-lambda] /tmp swept (task artifact lives in /task/)")
+        return 0
+    for name in names:
+        if name in keep:
+            continue
+        p = os.path.join(root, name)
+        try:
+            if os.path.isdir(p) and not os.path.islink(p):
+                shutil.rmtree(p, ignore_errors=True)
+            else:
+                os.remove(p)
+            n += 1
+        except OSError:
+            pass
+    return n
+
+_n_tmp = _sweep("/tmp")
+print(f"[seed-lambda] /tmp swept ({_n_tmp} entries removed; task artifact lives in /task/)")
+
+_n_home = _sweep("/home/agent", keep={".bashrc", ".bash_logout", ".profile"})
+if _n_home:
+    print(f"[seed-lambda] /home/agent swept ({_n_home} entries removed — anti-contamination)")
 
 # Remove the Docker-baked /opt/assessment/ to force fetch-from-Artifactory.
 if os.path.exists("/opt/assessment"):

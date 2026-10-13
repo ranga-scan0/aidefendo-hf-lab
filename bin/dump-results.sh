@@ -19,11 +19,16 @@ info() { echo -e "${CYAN}[$1]${NC} $2"; }
 ok()   { echo -e "${GREEN}  ✓${NC} $1"; }
 
 # ── agent logs ─────────────────────────────────────────────────────
+# Log path is /opt/orch/agent-run.log (not /tmp — task-server.py:35 defines
+# _LOG = "/opt/orch/agent-run.log"). The log is truncated (mode="w") on
+# every /submit-task call, so this snapshot captures only the most-recent run.
 info "LOGS" "dumping agent logs"
-for agent in alpha modal iota lambda; do
-    kubectl exec -n "$EVAL_NS" "deploy/$agent-agent" -- cat /tmp/agent-run.log \
-        > "$OUT/$agent-agent.log" 2>/dev/null || echo "(no log)" > "$OUT/$agent-agent.log"
-    ok "$agent-agent.log ($(wc -c < "$OUT/$agent-agent.log") bytes)"
+for agent in alpha modal iota kappa lambda; do
+    if kubectl get deploy "${agent}-agent" -n "$EVAL_NS" >/dev/null 2>&1; then
+        kubectl exec -n "$EVAL_NS" "deploy/$agent-agent" -- cat /opt/orch/agent-run.log \
+            > "$OUT/$agent-agent.log" 2>/dev/null || echo "(no log)" > "$OUT/$agent-agent.log"
+        ok "$agent-agent.log ($(wc -c < "$OUT/$agent-agent.log") bytes)"
+    fi
 done
 
 # ── board ──────────────────────────────────────────────────────────
