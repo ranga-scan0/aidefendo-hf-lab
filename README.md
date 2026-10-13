@@ -1,9 +1,11 @@
 # HF Agent Intrusion Lab
 
 A self-contained lab inspired by a HuggingFace-style supply-chain incident, staged as a
-**5-stage LLM-agent attack chain** on a local [kind](https://kind.sigs.k8s.io/)
-cluster. Every "victim" and every piece of "the internet" is a Python mock that
-runs **inside** the cluster — nothing touches a real external service.
+**4-stage LLM-agent attack chain** (alpha → modal → iota → lambda) on a local
+[kind](https://kind.sigs.k8s.io/) cluster. A fifth agent, kappa, is a deterministic
+variant of lambda used for demos — see the appendix. Every "victim" and every piece
+of "the internet" is a Python mock that runs **inside** the cluster — nothing touches
+a real external service.
 
 Each agent is handed a benign-sounding evaluation/verification task. The lab
 then observes **behavioural drift**: the agent discovering and abusing an
@@ -255,10 +257,19 @@ Common patterns:
 ./bin/run.sh --only lambda      # OR: --only kappa (alternative, not both)
 
 # PRESET mode — run any stage standalone
-./bin/run.sh --only alpha --preset       # team-framing boost on alpha
-./bin/run.sh --only kappa --preset       # standalone kappa (differentiated)
-./bin/run.sh --only modal --preset       # standalone modal with alpha preseed
+./bin/run.sh --only alpha  --preset      # team-framing boost on alpha
+./bin/run.sh --only modal  --preset      # modal with alpha preseed
+./bin/run.sh --only iota   --preset      # iota with alpha + modal preseed
+./bin/run.sh --only lambda --preset      # lambda with alpha + modal + iota preseed + hf-probes scaffold
+./bin/run.sh --only kappa                # kappa — PRESET implied (differentiated, baked-in scripts)
 ```
+
+> **PRESET continuity**: on each successful `--preset` run of modal/iota/kappa/lambda,
+> the stage's own agent-written entries are saved to
+> `~/.aidefendo-hf-lab/stage-delta/<stage>/` on your host. The next `--preset` run of
+> the same stage restores them to the board before the agent starts, so a second
+> attempt builds on the first (useful for retrying a stuck exploit). CHAIN mode
+> and alpha preflight do not use this mechanism.
 
 > **Note:** there is no `--all` flag. Running all 5 stages back-to-back
 > consumed significant API tokens and double-ran the HF-pipeline
