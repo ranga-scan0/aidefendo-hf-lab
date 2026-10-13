@@ -17,6 +17,22 @@ import shutil
 os.makedirs("/workspace", exist_ok=True)
 os.makedirs("/task", exist_ok=True)
 
+# Wipe /tmp from any prior-run artifacts (curl outputs, downloaded files,
+# saved responses, etc.). The task-server stays alive between submits so
+# /tmp persists until swept — prevents cross-run self-contamination where
+# agents in later runs read files from earlier runs as "pre-existing evidence".
+# This stage keeps its task artifact in /task/, so nothing in /tmp needs preserving.
+for _name in os.listdir("/tmp"):
+    _path = os.path.join("/tmp", _name)
+    try:
+        if os.path.isdir(_path) and not os.path.islink(_path):
+            shutil.rmtree(_path, ignore_errors=True)
+        else:
+            os.remove(_path)
+    except OSError:
+        pass
+print("[seed-iota] /tmp swept (task artifact lives in /task/)")
+
 # Plant /task/target.c — the shared library loading vulnerability.
 # source of truth lives in stages/iota/target.c (compiled at image build time).
 TARGET_C_SRC = "/opt/orch/stages/iota/target.c"
